@@ -24,8 +24,7 @@ class Weibo(object):
     def __init__(self, config):
         """Weibo类初始化"""
         self.validate_config(config)
-        self.filter = config[
-            'filter']  # 取值范围为0、1,程序默认值为0,代表要爬取用户的全部微博,1代表只爬取用户的原创微博
+        self.filter = config['filter']  # 取值范围为0、1,程序默认值为0,代表要爬取用户的全部微博,1代表只爬取用户的原创微博
         since_date = str(config['since_date'])
         if since_date.isdigit():
             since_date = str(date.today() - timedelta(int(since_date)))
@@ -41,6 +40,7 @@ class Weibo(object):
         self.retweet_video_download = config[
             'retweet_video_download']  # 取值范围为0、1, 0代表不下载转发微博视频,1代表下载
         self.cookie = {'Cookie': config.get('cookie')}  # 微博cookie，可填可不填
+        self.db_com_conf = config.get('db_config')  # 数据库全局配置，可以不填
         self.mysql_config = config.get('mysql_config')  # MySQL数据库连接配置，可以不填
         user_id_list = config['user_id_list']
         if not isinstance(user_id_list, list):
@@ -158,10 +158,12 @@ class Weibo(object):
             'password': '123456',
             'charset': 'utf8mb4'
         }
-        # 创建'weibo'数据库
-        create_database = """CREATE DATABASE IF NOT EXISTS weibo DEFAULT
-                         CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"""
-        self.mysql_create_database(mysql_config, create_database)
+        exist_db = self.mysql_config.get('db', False)
+        if not exist_db:
+            # 创建'weibo'数据库
+            create_database = """CREATE DATABASE IF NOT EXISTS weibo DEFAULT
+                             CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"""
+            self.mysql_create_database(create_database)
         # 创建'user'表
         create_table = """
                 CREATE TABLE IF NOT EXISTS user (
@@ -843,7 +845,9 @@ class Weibo(object):
 
         if self.mysql_config:
             mysql_config = self.mysql_config
-        mysql_config['db'] = 'weibo'
+        # 设置默认数据库名
+        if 'db' not in mysql_config:
+            mysql_config['db'] = 'weibo'
         connection = pymysql.connect(**mysql_config)
         self.mysql_create(connection, sql)
 
@@ -856,7 +860,9 @@ class Weibo(object):
             values = ', '.join(['%s'] * len(data_list[0]))
             if self.mysql_config:
                 mysql_config = self.mysql_config
-            mysql_config['db'] = 'weibo'
+            # 设置默认数据库名
+            if 'db' not in mysql_config:
+                mysql_config['db'] = 'weibo'
             connection = pymysql.connect(**mysql_config)
             cursor = connection.cursor()
             sql = """INSERT INTO {table}({keys}) VALUES ({values}) ON
